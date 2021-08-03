@@ -50,6 +50,9 @@ public class PrometheusListener extends AbstractBackendListenerClient implements
 	private static final String RUN_ID_KEY = "runId";
 	private static final String EXPORTER_PORT_KEY = "exporterPort";
 	private static final String SAMPLERS_LIST_KEY = "samplersRegExp";
+	private static final String RESPONSE_TIME_SLA = "responseTime_SLA";
+	private static final String PACING = "mainThreadGroupPacing";
+	private static final String UC_NAME = "UC_name";
 
 	// Property for enabling JVM metrics collection
 	public static final String PROMETHEUS_COLLECT_JVM = "prometheus.collect_jvm";
@@ -63,12 +66,18 @@ public class PrometheusListener extends AbstractBackendListenerClient implements
 
 	private int quantilesAge = JMeterUtils.getPropDefault(PROMETHEUS_QUANTILES_AGE, PROMETHEUS_QUANTILES_AGE_DEFAULT);
 
+	// Service variables
+	private static int tmp = 0;
+
 	// General values with defaults
 	private static String testName = "project";
 	private static String runId = "1";
 	private static int exporterPort = 9001;
 	private static String samplesRegEx = "UC.+";
 	private static String nodeName = "Test-Node";
+	private static int responseTimeSLA = 10;
+	private static int pacing = 3;
+	private static String ucName = "UC";
 
 	// Fields in metrics
 	private static String REQUEST_NAME = "requestName";
@@ -94,7 +103,9 @@ public class PrometheusListener extends AbstractBackendListenerClient implements
 	private transient Summary responseTimeCollector;
 	private transient Summary latencyCollector;
 	private transient Counter requestCollector;
+	private transient Counter expectedGeneralRequestCollector;
 	private transient Summary requestSizeCollector;
+	private transient Gauge responseTimeSLACollector;
 
 	private String[] requestSent = new String[]{"sent"};
 	private String[] requestReceived = new String[]{"received"};
@@ -165,31 +176,50 @@ public class PrometheusListener extends AbstractBackendListenerClient implements
 		arguments.addArgument(RUN_ID_KEY, runId);
 		arguments.addArgument(EXPORTER_PORT_KEY, String.valueOf(exporterPort));
 		arguments.addArgument(SAMPLERS_LIST_KEY, samplesRegEx);
+		arguments.addArgument(RESPONSE_TIME_SLA, String.valueOf(responseTimeSLA));
+		arguments.addArgument(PACING, String.valueOf(pacing));
+		arguments.addArgument(UC_NAME, ucName);
 		return arguments;
 	}
+
+	private double plannedTP5SCount = 0;
 
 	@Override
 	public void run() {
 		UserMetric userMetrics = getUserMetrics();
-
 		activeThreadsCollector.labels(defaultLabelValues).set(userMetrics.getStartedThreads() - userMetrics.getFinishedThreads());
+
+		double plannedTPS;
+		plannedTPS = (double) (userMetrics.getStartedThreads() - userMetrics.getFinishedThreads())/pacing;
+		plannedTP5SCount = plannedTP5SCount + plannedTPS * 5;
+		int i;
+		for (i = 0; i < plannedTP5SCount; i++){
+			expectedGeneralRequestCollector.labels(defaultLabelValues).inc();
+		}
+		plannedTP5SCount = plannedTP5SCount - i;
+
+		responseTimeSLACollector.labels(defaultLabelValues).set(responseTimeSLA);
 	}
 
 	@Override
 	public void setupTest(BackendListenerContext context) {
 		testName = context.getParameter(TEST_NAME_KEY);
 		runId = context.getParameter(RUN_ID_KEY);
+		ucName = context.getParameter(UC_NAME);
 		try {
 			nodeName = InetAddress.getLocalHost().getHostName();
 		} catch (UnknownHostException e) {
 			log.warn("Failed to get host name");
 		}
+		responseTimeSLA = Integer.valueOf(context.getParameter(RESPONSE_TIME_SLA));
+		pacing = Integer.valueOf(context.getIntParameter(PACING));
 
 
 		HashMap<String, String> defaultLabelsMap = new HashMap<>();
 		defaultLabelsMap.put(TEST_NAME, testName);
 		defaultLabelsMap.put(RUN_ID, runId);
 		defaultLabelsMap.put(NODE_NAME, nodeName);
+		defaultLabelsMap.put(UC_NAME, ucName);
 
 		defaultLabels = defaultLabelsMap.keySet().toArray(new String[defaultLabelsMap.size()]);
 		defaultLabelValues = defaultLabelsMap.values().toArray(new String[defaultLabelsMap.size()]);
@@ -238,6 +268,11 @@ public class PrometheusListener extends AbstractBackendListenerClient implements
 				.help("Counter for running threads")
 				.labelNames(ArrayUtils.addAll(defaultLabels, threadLabels))
 				.register();
+		responseTimeSLACollector = Gauge.build()
+				.name("responseTimeSLA")
+				.help("responseTimeSLA")
+				.labelNames(ArrayUtils.addAll(defaultLabels))
+				.register();
 		activeThreadsCollector = Gauge.build()
 				.name("jmeter_active_threads")
 				.help("Counter for active threads")
@@ -265,6 +300,11 @@ public class PrometheusListener extends AbstractBackendListenerClient implements
 				.name("jmeter_requests")
 				.help("Counter for requests")
 				.labelNames(ArrayUtils.addAll(defaultLabels, requestLabels))
+				.register();
+		expectedGeneralRequestCollector = Counter.build()
+				.name("jmeter_expected_UC_counter")
+				.help("Counter for main usecase")
+				.labelNames(ArrayUtils.addAll(defaultLabels))
 				.register();
 		requestSizeCollector = Summary.build()
 				.name("jmeter_request_size")
