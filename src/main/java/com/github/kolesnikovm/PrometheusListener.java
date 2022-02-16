@@ -66,8 +66,8 @@ public class PrometheusListener extends AbstractBackendListenerClient implements
 
 	private int quantilesAge = JMeterUtils.getPropDefault(PROMETHEUS_QUANTILES_AGE, PROMETHEUS_QUANTILES_AGE_DEFAULT);
 
-	// Service variables
-	private static int tmp = 0;
+	// Version param
+	private static int ver = 220;
 
 	// General values with defaults
 	private static String testName = "project";
@@ -76,7 +76,7 @@ public class PrometheusListener extends AbstractBackendListenerClient implements
 	private static String samplesRegEx = "UC.+";
 	private static String nodeName = "Test-Node";
 	private static int responseTimeSLA = 10;
-	private static int pacing = 3;
+	private static float pacing = 3;
 	private static String ucName = "UC";
 
 	// Fields in metrics
@@ -190,7 +190,8 @@ public class PrometheusListener extends AbstractBackendListenerClient implements
 		activeThreadsCollector.labels(defaultLabelValues).set(userMetrics.getStartedThreads() - userMetrics.getFinishedThreads());
 
 		double plannedTPS;
-		plannedTPS = (double) (userMetrics.getStartedThreads() - userMetrics.getFinishedThreads())/pacing;
+		float CurrentTreads = (float) userMetrics.getStartedThreads() - userMetrics.getFinishedThreads();
+		plannedTPS = (double) (CurrentTreads)/pacing;
 		plannedTP5SCount = plannedTP5SCount + plannedTPS * 5;
 		int i;
 		for (i = 0; i < plannedTP5SCount; i++){
@@ -205,15 +206,21 @@ public class PrometheusListener extends AbstractBackendListenerClient implements
 	public void setupTest(BackendListenerContext context) {
 		testName = context.getParameter(TEST_NAME_KEY);
 		runId = context.getParameter(RUN_ID_KEY);
-		ucName = context.getParameter(UC_NAME);
+
 		try {
 			nodeName = InetAddress.getLocalHost().getHostName();
 		} catch (UnknownHostException e) {
 			log.warn("Failed to get host name");
 		}
-		responseTimeSLA = Integer.valueOf(context.getParameter(RESPONSE_TIME_SLA));
-		pacing = Integer.valueOf(context.getIntParameter(PACING));
-
+		if ((context.getParameter(UC_NAME) == null) || (context.getParameter(RESPONSE_TIME_SLA) == null) ||
+				(context.getParameter(PACING) == null)) {
+			ver = 220;
+		} else {
+			ucName = context.getParameter(UC_NAME);
+			responseTimeSLA = Integer.valueOf(context.getParameter(RESPONSE_TIME_SLA));
+			pacing = Float.parseFloat(context.getParameter(PACING));
+			ver = 221;
+		}
 
 		HashMap<String, String> defaultLabelsMap = new HashMap<>();
 		defaultLabelsMap.put(TEST_NAME, testName);
@@ -268,11 +275,6 @@ public class PrometheusListener extends AbstractBackendListenerClient implements
 				.help("Counter for running threads")
 				.labelNames(ArrayUtils.addAll(defaultLabels, threadLabels))
 				.register();
-		responseTimeSLACollector = Gauge.build()
-				.name("responseTimeSLA")
-				.help("responseTimeSLA")
-				.labelNames(ArrayUtils.addAll(defaultLabels))
-				.register();
 		activeThreadsCollector = Gauge.build()
 				.name("jmeter_active_threads")
 				.help("Counter for active threads")
@@ -301,16 +303,25 @@ public class PrometheusListener extends AbstractBackendListenerClient implements
 				.help("Counter for requests")
 				.labelNames(ArrayUtils.addAll(defaultLabels, requestLabels))
 				.register();
-		expectedGeneralRequestCollector = Counter.build()
-				.name("jmeter_expected_UC_counter")
-				.help("Counter for main usecase")
-				.labelNames(ArrayUtils.addAll(defaultLabels))
-				.register();
 		requestSizeCollector = Summary.build()
 				.name("jmeter_request_size")
 				.help("Summary for jmeter request size in bytes")
 				.labelNames(ArrayUtils.addAll(defaultLabels, requestSizeLabels))
 				.register();
+
+//		2.2.1 features
+		if (ver >= 221) {
+			responseTimeSLACollector = Gauge.build()
+					.name("responseTimeSLA")
+					.help("responseTimeSLA")
+					.labelNames(ArrayUtils.addAll(defaultLabels))
+					.register();
+			expectedGeneralRequestCollector = Counter.build()
+					.name("jmeter_expected_UC_counter")
+					.help("Counter for main usecase")
+					.labelNames(ArrayUtils.addAll(defaultLabels))
+					.register();
+		}
 	}
 
 	private void startExportingServer(int port) {
