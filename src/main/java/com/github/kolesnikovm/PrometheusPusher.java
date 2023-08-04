@@ -111,15 +111,15 @@ public class PrometheusPusher extends AbstractBackendListenerClient implements R
 	private static String REQUEST_STATUS = "requestStatus";
 	private static String REQUEST_DIRECTION = "requestDirection";
 	private static String IS_TRANSACTION = "isTransaction";
-	private static String IS_FAILURE = "isFailure";
 	private static String FAILURE_MESSAGE = "failureMessage";
+	private static String PARENT = "parent";
 
 	private String[] defaultLabels;
 	private String[] defaultLabelValues;
 	private String[] threadLabels = new String[]{ THREAD_GROUP };
-	private String[] requestLabels = new String[]{ REQUEST_NAME, RESPONSE_CODE, RESPONSE_MESSAGE, REQUEST_STATUS, IS_TRANSACTION };
-	private String[] requestSizeLabels = new String[]{ REQUEST_DIRECTION, REQUEST_NAME, IS_TRANSACTION };
-	private String[] assertionResultLabels = new String[]{ REQUEST_NAME, IS_FAILURE, FAILURE_MESSAGE };
+	private String[] requestLabels = new String[]{ REQUEST_NAME, RESPONSE_CODE, RESPONSE_MESSAGE, REQUEST_STATUS, IS_TRANSACTION, PARENT };
+	private String[] requestSizeLabels = new String[]{ REQUEST_DIRECTION, REQUEST_NAME, IS_TRANSACTION, PARENT };
+	private String[] assertionResultLabels = new String[]{ REQUEST_NAME, FAILURE_MESSAGE };
 
 	private transient Server server;
 	// Prometheus collectors
@@ -194,16 +194,18 @@ public class PrometheusPusher extends AbstractBackendListenerClient implements R
 						.labels(ArrayUtils.addAll(defaultLabelValues, getLabelValues(sampleResult, requestLabels)))
 						.inc();
 				requestSizeCollector
-						.labels(ArrayUtils.addAll(defaultLabelValues, ArrayUtils.addAll(requestSent, sampleResult.getSampleLabel(), isTransaction(sampleResult))))
+						.labels(ArrayUtils.addAll(defaultLabelValues, ArrayUtils.addAll(requestSent, sampleResult.getSampleLabel(), isTransaction(sampleResult), getParent(sampleResult))))
 						.observe(sampleResult.getSentBytes());
 				requestSizeCollector
-						.labels(ArrayUtils.addAll(defaultLabelValues, ArrayUtils.addAll(requestReceived, sampleResult.getSampleLabel(), isTransaction(sampleResult))))
+						.labels(ArrayUtils.addAll(defaultLabelValues, ArrayUtils.addAll(requestReceived, sampleResult.getSampleLabel(), isTransaction(sampleResult), getParent(sampleResult))))
 						.observe(sampleResult.getBytesAsLong());
 				if (collectAssertions) {
 					for (AssertionResult assertionResult : sampleResult.getAssertionResults()) {
-						assertionResultCollector
-								.labels(ArrayUtils.addAll(defaultLabelValues, sampleResult.getSampleLabel(), String.valueOf(assertionResult.isFailure()), assertionResult.getFailureMessage()))
-								.inc();
+						if (assertionResult.isFailure()) {
+							assertionResultCollector
+									.labels(ArrayUtils.addAll(defaultLabelValues, sampleResult.getSampleLabel(), assertionResult.getFailureMessage()))
+									.inc();
+						}
 					}
 				}
 			}
@@ -261,6 +263,7 @@ public class PrometheusPusher extends AbstractBackendListenerClient implements R
 			methodsMap.put(THREAD_GROUP, PrometheusPusher.class.getMethod("getThreadGroup", SampleResult.class));
 			methodsMap.put(REQUEST_STATUS, PrometheusPusher.class.getMethod("getRequestStatus", SampleResult.class));
 			methodsMap.put(IS_TRANSACTION, PrometheusPusher.class.getMethod("isTransaction", SampleResult.class));
+			methodsMap.put(PARENT, PrometheusPusher.class.getMethod("getParent", SampleResult.class));
 		} catch (NoSuchMethodException e) {
 			e.printStackTrace();
 		}
@@ -454,6 +457,12 @@ public class PrometheusPusher extends AbstractBackendListenerClient implements R
 		} catch(Exception e){
 			log.error("Failed to push metrics: {}", e);
 		}
+	}
+	public String getParent(SampleResult sampleResult) {
+		if (sampleResult.getParent() != null){
+			return sampleResult.getParent().getSampleLabel();
+		}
+		return "null";
 	}
 
 }

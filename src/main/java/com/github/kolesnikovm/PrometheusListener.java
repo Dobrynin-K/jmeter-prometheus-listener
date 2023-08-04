@@ -92,7 +92,6 @@ public class PrometheusListener extends AbstractBackendListenerClient implements
 	private static String REQUEST_NAME = "requestName";
 	private static String RESPONSE_CODE = "responseCode";
 	private static String RESPONSE_MESSAGE = "responseMessage";
-	private static String PROJECT_NAME = "projectName";
 	private static String TEST_NAME = "testName";
 	private static String NODE_NAME = "nodeName";
 	private static String RUN_ID = "runId";
@@ -178,11 +177,8 @@ public class PrometheusListener extends AbstractBackendListenerClient implements
 						.labels(ArrayUtils.addAll(defaultLabelValues, getLabelValues(sampleResult, requestLabels)))
 						.inc();
 				requestSizeCollector
-						.labels(ArrayUtils.addAll(defaultLabelValues, ArrayUtils.addAll(requestSent, sampleResult.getSampleLabel(), isTransaction(sampleResult),getParent(sampleResult))))
+						.labels(ArrayUtils.addAll(defaultLabelValues, ArrayUtils.addAll(requestSent, sampleResult.getSampleLabel(), isTransaction(sampleResult), getParent(sampleResult))))
 						.observe(sampleResult.getSentBytes());
-				requestSizeCollector
-						.labels(ArrayUtils.addAll(defaultLabelValues, ArrayUtils.addAll(requestReceived, sampleResult.getSampleLabel(), isTransaction(sampleResult),getParent(sampleResult))))
-						.observe(sampleResult.getBytesAsLong());
 				if (collectAssertions) {
 					for (AssertionResult assertionResult : sampleResult.getAssertionResults()) {
 						assertionResultCollector
@@ -225,7 +221,6 @@ public class PrometheusListener extends AbstractBackendListenerClient implements
 		}
 
 		HashMap<String, String> defaultLabelsMap = new HashMap<>();
-		defaultLabelsMap.put(PROJECT_NAME, projectName);
 		defaultLabelsMap.put(TEST_NAME, testName);
 		defaultLabelsMap.put(RUN_ID, runId);
 		defaultLabelsMap.put(NODE_NAME, nodeName);
@@ -420,9 +415,9 @@ public class PrometheusListener extends AbstractBackendListenerClient implements
 	}
 
 	public String getParent(SampleResult sampleResult) {
-		if (sampleResult.getParent() == null){
-			return sampleResult.getSampleLabel();
+		if (sampleResult.getParent() != null){
+			return sampleResult.getParent().getSampleLabel();
 		}
-		return getParent(sampleResult.getParent());
+		return "null";
 	}
 }

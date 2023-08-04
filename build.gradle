@@ -5,7 +5,7 @@ plugins {
 }
 
 group = "io.github.kolesnikovm"
-version = '2.6.2.RADAR'
+version = '2.6.3.RADAR+'
 sourceCompatibility = 1.8
 
 repositories {
@@ -43,54 +43,54 @@ java {
     withSourcesJar()
 }
 
-publishing {
-    publications {
-        mavenJava(MavenPublication) {
-            artifactId = rootProject.name
-
-            artifact fatJar
-            artifact javadocJar
-            artifact sourcesJar
-
-            pom {
-                name = 'JMeter Prometheus Listener'
-                description = 'Apache JMeter Backend Listener implementation for Prometheus metrics exporting.'
-                url = 'https://github.com/kolesnikovm/jmeter-prometheus-listener'
-
-                licenses {
-                    license {
-                        name = 'The Apache License, Version 2.0'
-                        url = 'http://www.apache.org/licenses/LICENSE-2.0.txt'
-                    }
-                }
-                developers {
-                    developer {
-                        id = 'kolesnikovm'
-                        name = 'Maxim Kolesnikov'
-                        email = 'maxxim.kolesnikov@gmail.com'
-                    }
-                }
-                scm {
-                    connection = 'scm:git:git://github.com/kolesnikovm/jmeter-prometheus-listener.git'
-                    developerConnection = 'scm:git:ssh://github.com:kolesnikovm/jmeter-prometheus-listener.git'
-                    url = 'https://github.com/kolesnikovm/jmeter-prometheus-listener'
-                }
-            }
-        }
-    }
-    repositories {
-        maven {
-            credentials {
-                username = "$ossrhUsername"
-                password = "$ossrhPassword"
-            }
-            def releasesRepoUrl = "https://s01.oss.sonatype.org/service/local/staging/deploy/maven2/"
-            def snapshotsRepoUrl = "https://s01.oss.sonatype.org/content/repositories/snapshots/"
-            url = version.endsWith('SNAPSHOT') ? snapshotsRepoUrl : releasesRepoUrl
-        }
-    }
-}
-
-signing {
-    sign publishing.publications.mavenJava
-}
+//publishing {
+//    publications {
+//        mavenJava(MavenPublication) {
+//            artifactId = rootProject.name
+//
+//            artifact fatJar
+//            artifact javadocJar
+//            artifact sourcesJar
+//
+//            pom {
+//                name = 'JMeter Prometheus Listener'
+//                description = 'Apache JMeter Backend Listener implementation for Prometheus metrics exporting.'
+//                url = 'https://github.com/kolesnikovm/jmeter-prometheus-listener'
+//
+//                licenses {
+//                    license {
+//                        name = 'The Apache License, Version 2.0'
+//                        url = 'http://www.apache.org/licenses/LICENSE-2.0.txt'
+//                    }
+//                }
+//                developers {
+//                    developer {
+//                        id = 'kolesnikovm'
+//                        name = 'Maxim Kolesnikov'
+//                        email = 'maxxim.kolesnikov@gmail.com'
+//                    }
+//                }
+//                scm {
+//                    connection = 'scm:git:git://github.com/kolesnikovm/jmeter-prometheus-listener.git'
+//                    developerConnection = 'scm:git:ssh://github.com:kolesnikovm/jmeter-prometheus-listener.git'
+//                    url = 'https://github.com/kolesnikovm/jmeter-prometheus-listener'
+//                }
+//            }
+//        }
+//    }
+//    repositories {
+//        maven {
+//            credentials {
+//                username = "$ossrhUsername"
+//                password = "$ossrhPassword"
+//            }
+//            def releasesRepoUrl = "https://s01.oss.sonatype.org/service/local/staging/deploy/maven2/"
+//            def snapshotsRepoUrl = "https://s01.oss.sonatype.org/content/repositories/snapshots/"
+//            url = version.endsWith('SNAPSHOT') ? snapshotsRepoUrl : releasesRepoUrl
+//        }
+//    }
+//}
+//
+//signing {
+//    sign publishing.publications.mavenJava
+//}
